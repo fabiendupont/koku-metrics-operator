@@ -134,6 +134,18 @@ Fields for metrics related to NVIDIA GPUs:
 * `mig_profile`: The MIG profile (for example, `1g.5gb`) associated with the workload. Empty for non-MIG workloads.
 * `mig_strategy`: The node MIG strategy label (for example, `single`, `mixed`, or `none`) when available.
 
+### 7. Inference Token Metrics
+
+Fields for metrics related to inference token usage from vLLM serving endpoints:
+
+* `node`: The name of the node where the inference pod is running.
+* `namespace`: The namespace where the inference pod is running.
+* `pod`: The name of the pod serving inference requests.
+* `model_name`: The name of the model being served by the inference endpoint.
+* `inference_input_tokens`: The total number of input (prompt) tokens processed during the reporting period.
+* `inference_output_tokens`: The total number of output (generation) tokens produced during the reporting period.
+
+
 ## Resource Optimization (ROS) Reports:
 
 ### 1. Container Metrics

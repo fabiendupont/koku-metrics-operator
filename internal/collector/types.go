@@ -52,6 +52,9 @@ func newPodRow(ts *promv1.Range) podRow             { return podRow{dateTimes: n
 func newStorageRow(ts *promv1.Range) storageRow     { return storageRow{dateTimes: newDates(ts)} }
 func newVMRow(ts *promv1.Range) vmRow               { return vmRow{dateTimes: newDates(ts)} }
 func newNvidiaGpuRow(ts *promv1.Range) nvidiaGpuRow { return nvidiaGpuRow{dateTimes: newDates(ts)} }
+func newInferenceTokenRow(ts *promv1.Range) inferenceTokenRow {
+	return inferenceTokenRow{dateTimes: newDates(ts)}
+}
 func newROSContainerRow(ts *promv1.Range) rosContainerRow {
 	return rosContainerRow{dateTimes: newDates(ts)}
 }
@@ -435,6 +438,51 @@ func (row nvidiaGpuRow) csvRow() []string {
 }
 
 func (row nvidiaGpuRow) string() string { return strings.Join(row.csvRow(), ",") }
+
+type inferenceTokenRow struct {
+	*dateTimes
+	Node             string `mapstructure:"node"`
+	Namespace        string `mapstructure:"namespace"`
+	Pod              string `mapstructure:"pod"`
+	ModelName        string `mapstructure:"model_name"`
+	InferenceService string `mapstructure:"inference_service"`
+	InputTokens      string `mapstructure:"inference-input-tokens"`
+	OutputTokens     string `mapstructure:"inference-output-tokens"`
+}
+
+func (inferenceTokenRow) csvHeader() []string {
+	return []string{
+		"report_period_start",
+		"report_period_end",
+		"interval_start",
+		"interval_end",
+		"node",
+		"namespace",
+		"pod",
+		"model_name",
+		"inference_service",
+		"inference_input_tokens",
+		"inference_output_tokens",
+	}
+}
+
+func (row inferenceTokenRow) csvRow() []string {
+	return []string{
+		row.ReportPeriodStart,
+		row.ReportPeriodEnd,
+		row.IntervalStart,
+		row.IntervalEnd,
+		row.Node,
+		row.Namespace,
+		row.Pod,
+		row.ModelName,
+		row.InferenceService,
+		row.InputTokens,
+		row.OutputTokens,
+	}
+}
+
+func (row inferenceTokenRow) string() string { return strings.Join(row.csvRow(), ",") }
 
 type rosContainerRow struct {
 	*dateTimes

@@ -30,8 +30,9 @@ var (
 	vmFilePrefix           = "cm-openshift-vm-usage-"
 	nodeFilePrefix         = "cm-openshift-node-usage-"
 	namespaceFilePrefix    = "cm-openshift-namespace-usage-"
-	nvidiaGpuFilePrefix    = "cm-openshift-nvidia-gpu-usage-"
-	rosContainerFilePrefix = "ros-openshift-container-"
+	nvidiaGpuFilePrefix        = "cm-openshift-nvidia-gpu-usage-"
+	inferenceTokenFilePrefix   = "cm-openshift-inference-token-usage-"
+	rosContainerFilePrefix     = "ros-openshift-container-"
 	rosNamespaceFilePrefix = "ros-openshift-namespace-"
 
 	statusTimeFormat = "2006-01-02 15:04:05"
@@ -296,6 +297,11 @@ func generateCostManagementReports(log gologr.Logger, c *PrometheusCollector, di
 
 	//cost nvidia gpu metrics
 	if err := generateCostNvidiaGpuMetricsReport(log, c, dirCfg, yearMonth); err != nil {
+		return err
+	}
+
+	// cost inference token metrics
+	if err := generateInferenceTokenMetricsReport(log, c, dirCfg, yearMonth); err != nil {
 		return err
 	}
 
@@ -568,6 +574,67 @@ func generateCostNvidiaGpuMetricsReport(log gologr.Logger, c *PrometheusCollecto
 	log.WithName("writeResults").Info("writing cost nvidia gpu results to file", "filename", nvidiaGpuReport.file.getName())
 	if err := nvidiaGpuReport.writeReport(); err != nil {
 		return fmt.Errorf("failed to write cost nvidia gpu report: %v", err)
+	}
+	return nil
+}
+
+// generateInferenceTokenMetricsReport generates the report for inference token metrics.
+func generateInferenceTokenMetricsReport(log gologr.Logger, c *PrometheusCollector, dirCfg *dirconfig.DirectoryConfig, yearMonth string) error {
+	log.Info("querying for cost inference token metrics")
+
+	inputTokenResults := mappedResults{}
+	log.Info("querying for inference input token metrics")
+	if err := c.getQueryRangeResults(costInferenceInputTokenQueries, &inputTokenResults, MaxRetries); err != nil {
+		return err
+	}
+
+	outputTokenResults := mappedResults{}
+	log.Info("querying for inference output token metrics")
+	if err := c.getQueryRangeResults(costInferenceOutputTokenQueries, &outputTokenResults, MaxRetries); err != nil {
+		return err
+	}
+
+	inferenceTokenRows := make(mappedCSVStruct)
+
+	for key, val := range inputTokenResults {
+		if outputVal, ok := outputTokenResults[key]; ok {
+			for dataKey, dataVal := range outputVal {
+				val[dataKey] = dataVal
+			}
+		}
+
+		usage := newInferenceTokenRow(c.TimeSeries)
+		if err := getStruct(val, &usage, inferenceTokenRows, key); err != nil {
+			return err
+		}
+	}
+
+	// Handle output-only entries that have no matching input
+	for key, val := range outputTokenResults {
+		if _, ok := inputTokenResults[key]; !ok {
+			usage := newInferenceTokenRow(c.TimeSeries)
+			if err := getStruct(val, &usage, inferenceTokenRows, key); err != nil {
+				return err
+			}
+		}
+	}
+
+	emptyInferenceTokenRow := newInferenceTokenRow(c.TimeSeries)
+	inferenceTokenReport := report{
+		file: &file{
+			name: inferenceTokenFilePrefix + yearMonth + ".csv",
+			path: dirCfg.Reports.Path,
+		},
+		data: &data{
+			queryData: inferenceTokenRows,
+			headers:   emptyInferenceTokenRow.csvHeader(),
+			prefix:    emptyInferenceTokenRow.dateTimes.string(),
+		},
+	}
+
+	log.WithName("writeResults").Info("writing cost inference token results to file", "filename", inferenceTokenReport.file.getName())
+	if err := inferenceTokenReport.writeReport(); err != nil {
+		return fmt.Errorf("failed to write cost inference token report: %v", err)
 	}
 	return nil
 }
