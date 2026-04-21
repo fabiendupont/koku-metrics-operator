@@ -48,6 +48,29 @@ var (
 		"cost:nvidia_gpu_utilization":                 "sum by (exported_pod, exported_namespace, Hostname, UUID, modelName, GPU_I_ID, GPU_I_PROFILE, device) (DCGM_FI_PROF_GR_ENGINE_ACTIVE{UUID!=''}) * on(exported_pod, exported_namespace) group_left(pod, namespace) max by (exported_pod, exported_namespace) (label_replace(label_replace(kube_pod_status_phase{phase='Running'}, 'exported_pod', '$1', 'pod', '(.*)'), 'exported_namespace', '$1', 'namespace', '(.*)'))",
 		"cost:nvidia_gpu_max_slices":                  "sum by (exported_pod, exported_namespace, Hostname, UUID, modelName, GPU_I_ID, GPU_I_PROFILE) (DCGM_FI_DEV_MIG_MAX_SLICES{UUID!=''}) * on(exported_pod, exported_namespace) group_left(pod, namespace) max by (exported_pod, exported_namespace) (label_replace(label_replace(kube_pod_status_phase{phase='Running'}, 'exported_pod', '$1', 'pod', '(.*)'), 'exported_namespace', '$1', 'namespace', '(.*)'))",
 
+		// cost inference token metrics queries — vLLM native
+		// Join with kube_pod_labels to extract the KServe InferenceService name
+		// (serving.kserve.io/inferenceservice pod label). If the pod has no KServe label,
+		// inference_service will be empty in the result.
+		"cost:inference_input_tokens":  "sum by (exported_pod, exported_namespace, Hostname, model_name, label_serving_kserve_io_inferenceservice) (increase(vllm:prompt_tokens_total[1h]) * on(exported_pod, exported_namespace) group_left(label_serving_kserve_io_inferenceservice) label_replace(label_replace(kube_pod_labels, 'exported_pod', '$1', 'pod', '(.*)'), 'exported_namespace', '$1', 'namespace', '(.*)'))",
+		"cost:inference_output_tokens": "sum by (exported_pod, exported_namespace, Hostname, model_name, label_serving_kserve_io_inferenceservice) (increase(vllm:generation_tokens_total[1h]) * on(exported_pod, exported_namespace) group_left(label_serving_kserve_io_inferenceservice) label_replace(label_replace(kube_pod_labels, 'exported_pod', '$1', 'pod', '(.*)'), 'exported_namespace', '$1', 'namespace', '(.*)'))",
+
+		// cost inference token metrics queries — OTel GenAI semantic conventions
+		// These metrics follow the OpenTelemetry gen_ai.client.token.usage standard
+		// (https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-metrics/).
+		// Sources: MLflow (MLFLOW_ENABLE_OTEL_GENAI_SEMCONV=true), Envoy AI Gateway,
+		// or any OTel-instrumented inference stack.
+		// Prometheus converts OTel histogram gen_ai.client.token.usage to
+		// gen_ai_client_token_usage (dots→underscores). The _sum suffix gives
+		// cumulative token counts.
+		"cost:otel_genai_input_tokens":  "sum by (namespace, pod, gen_ai_request_model) (gen_ai_client_token_usage_sum{gen_ai_token_type='input'})",
+		"cost:otel_genai_output_tokens": "sum by (namespace, pod, gen_ai_request_model) (gen_ai_client_token_usage_sum{gen_ai_token_type='output'})",
+
+		// Identity-based token metrics from Kuadrant Limitador.
+		// authorized_hits tracks token consumption per user/organization via TelemetryPolicy.
+		// Labels come from auth.identity selectors (Keycloak JWT claims).
+		"cost:identity_token_hits": "sum by (limitador_namespace, organization, user) (authorized_hits)",
+
 		// resource optimization container metrics queries
 		"ros:namespace_filter":               "kube_namespace_labels{label_insights_cost_management_optimizations='true', namespace!~'kube-.*|openshift|openshift-.*'} or kube_namespace_labels{label_cost_management_optimizations='true', namespace!~'kube-.*|openshift|openshift-.*'}",
 		"ros:image_owners":                   "((max_over_time(kube_pod_container_info{container!='', container!='POD'}[15m]) * on(namespace) group_left kube_namespace_labels{label_insights_cost_management_optimizations='true', namespace!~'kube-.*|openshift|openshift-.*'}) or (max_over_time(kube_pod_container_info{container!='', container!='POD'}[15m]) * on(namespace) group_left kube_namespace_labels{label_cost_management_optimizations='true', namespace!~'kube-.*|openshift|openshift-.*'})) * on(pod, namespace) group_left(owner_kind, owner_name) max by(pod, namespace, owner_kind, owner_name) (max_over_time(kube_pod_owner{container!='', container!='POD', pod!=''}[15m]))",
@@ -536,6 +559,89 @@ var (
 				ValName: "nvidia-gpu-max-slices",
 			},
 			RowKey: []model.LabelName{"exported_pod", "exported_namespace", "Hostname", "UUID", "GPU_I_ID"},
+		},
+	}
+	costInferenceInputTokenQueries = &querys{
+		query{
+			Name:        "inference-input-tokens",
+			QueryString: QueryMap["cost:inference_input_tokens"],
+			MetricKey: staticFields{
+				"pod":               "exported_pod",
+				"namespace":         "exported_namespace",
+				"node":              "Hostname",
+				"model_name":        "model_name",
+				"inference_service": "label_serving_kserve_io_inferenceservice",
+			},
+			QueryValue: &saveQueryValue{
+				Method:  "sum",
+				ValName: "inference-input-tokens",
+			},
+			RowKey: []model.LabelName{"exported_pod", "exported_namespace", "Hostname", "model_name", "label_serving_kserve_io_inferenceservice"},
+		},
+	}
+	costInferenceOutputTokenQueries = &querys{
+		query{
+			Name:        "inference-output-tokens",
+			QueryString: QueryMap["cost:inference_output_tokens"],
+			MetricKey: staticFields{
+				"pod":               "exported_pod",
+				"namespace":         "exported_namespace",
+				"node":              "Hostname",
+				"model_name":        "model_name",
+				"inference_service": "label_serving_kserve_io_inferenceservice",
+			},
+			QueryValue: &saveQueryValue{
+				Method:  "sum",
+				ValName: "inference-output-tokens",
+			},
+			RowKey: []model.LabelName{"exported_pod", "exported_namespace", "Hostname", "model_name", "label_serving_kserve_io_inferenceservice"},
+		},
+	}
+	costOtelGenaiInputTokenQueries = &querys{
+		query{
+			Name:        "inference-input-tokens",
+			QueryString: QueryMap["cost:otel_genai_input_tokens"],
+			MetricKey: staticFields{
+				"pod":        "pod",
+				"namespace":  "namespace",
+				"model_name": "gen_ai_request_model",
+			},
+			QueryValue: &saveQueryValue{
+				Method:  "sum",
+				ValName: "inference-input-tokens",
+			},
+			RowKey: []model.LabelName{"pod", "namespace", "gen_ai_request_model"},
+		},
+	}
+	costOtelGenaiOutputTokenQueries = &querys{
+		query{
+			Name:        "inference-output-tokens",
+			QueryString: QueryMap["cost:otel_genai_output_tokens"],
+			MetricKey: staticFields{
+				"pod":        "pod",
+				"namespace":  "namespace",
+				"model_name": "gen_ai_request_model",
+			},
+			QueryValue: &saveQueryValue{
+				Method:  "sum",
+				ValName: "inference-output-tokens",
+			},
+			RowKey: []model.LabelName{"pod", "namespace", "gen_ai_request_model"},
+		},
+	}
+	costIdentityTokenHitsQueries = &querys{
+		query{
+			Name:        "identity-token-hits",
+			QueryString: QueryMap["cost:identity_token_hits"],
+			MetricKey: staticFields{
+				"namespace":    "limitador_namespace",
+				"organization": "organization",
+			},
+			QueryValue: &saveQueryValue{
+				Method:  "sum",
+				ValName: "inference-input-tokens",
+			},
+			RowKey: []model.LabelName{"limitador_namespace", "organization", "user"},
 		},
 	}
 	rosContainerQueries = &querys{
