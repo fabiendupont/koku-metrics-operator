@@ -604,8 +604,24 @@ func generateInferenceTokenMetricsReport(log gologr.Logger, c *PrometheusCollect
 	slaResults := mappedResults{}
 	log.Info("querying for vLLM SLA compliance metrics")
 	if err := c.getQueryRangeResults(costInferenceSLAComplianceQueries, &slaResults, MaxRetries); err != nil {
-		// SLA metrics are optional — log and continue if unavailable
 		log.Info("SLA compliance metrics not available, skipping")
+	}
+
+	// Query bucketed SLA fractions for tiered discounts.
+	for _, bucketQuery := range []*querys{costInferenceSLAGoodQueries, costInferenceSLADegradedQueries, costInferenceSLABreachedQueries} {
+		bucketResults := mappedResults{}
+		if err := c.getQueryRangeResults(bucketQuery, &bucketResults, MaxRetries); err != nil {
+			log.Info("SLA bucket metrics not available, skipping")
+			break
+		}
+		for key, val := range bucketResults {
+			if slaResults[key] == nil {
+				slaResults[key] = mappedValues{}
+			}
+			for dataKey, dataVal := range val {
+				slaResults[key][dataKey] = dataVal
+			}
+		}
 	}
 
 	// If vLLM metrics returned no results, try OTel GenAI standard metrics.

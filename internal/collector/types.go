@@ -450,6 +450,9 @@ type inferenceTokenRow struct {
 	InputTokens      string `mapstructure:"inference-input-tokens"`
 	OutputTokens     string `mapstructure:"inference-output-tokens"`
 	SLACompliance    string `mapstructure:"inference-sla-compliance"`
+	SLAGood          string `mapstructure:"inference-sla-good"`
+	SLADegraded      string `mapstructure:"inference-sla-degraded"`
+	SLABreached      string `mapstructure:"inference-sla-breached"`
 }
 
 func (inferenceTokenRow) csvHeader() []string {
@@ -467,6 +470,9 @@ func (inferenceTokenRow) csvHeader() []string {
 		"inference_input_tokens",
 		"inference_output_tokens",
 		"sla_compliance",
+		"sla_good",
+		"sla_degraded",
+		"sla_breached",
 	}
 }
 
@@ -485,6 +491,9 @@ func (row inferenceTokenRow) csvRow() []string {
 		row.InputTokens,
 		row.OutputTokens,
 		row.SLACompliance,
+		row.SLAGood,
+		row.SLADegraded,
+		row.SLABreached,
 	}
 }
 

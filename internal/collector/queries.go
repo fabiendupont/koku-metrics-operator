@@ -73,6 +73,14 @@ var (
 		// Returns a value between 0.0 (all breached) and 1.0 (all compliant).
 		"cost:inference_sla_compliance": "histogram_fraction(0, 0.5, sum by (exported_pod, exported_namespace, Hostname, model_name) (rate(vllm:time_to_first_token_seconds_bucket[1h])))",
 
+		// Bucketed SLA fractions for tiered discounts.
+		// sla_good: fraction of requests with TTFT < 500ms (full price)
+		// sla_degraded: fraction with 500ms <= TTFT < 2s (partial discount)
+		// sla_breached: fraction with TTFT >= 2s (full discount)
+		"cost:inference_sla_good":     "histogram_fraction(0, 0.5, sum by (exported_pod, exported_namespace, Hostname, model_name) (rate(vllm:time_to_first_token_seconds_bucket[1h])))",
+		"cost:inference_sla_degraded": "histogram_fraction(0.5, 2.0, sum by (exported_pod, exported_namespace, Hostname, model_name) (rate(vllm:time_to_first_token_seconds_bucket[1h])))",
+		"cost:inference_sla_breached": "histogram_fraction(2.0, +Inf, sum by (exported_pod, exported_namespace, Hostname, model_name) (rate(vllm:time_to_first_token_seconds_bucket[1h])))",
+
 		// Identity-based token metrics from Kuadrant Limitador.
 		// authorized_hits tracks token consumption per user/organization via TelemetryPolicy.
 		// Labels come from auth.identity selectors (Keycloak JWT claims).
@@ -619,6 +627,48 @@ var (
 				ValName: "inference-sla-compliance",
 			},
 			RowKey: []model.LabelName{"exported_pod", "exported_namespace", "Hostname", "model_name"},
+		},
+	}
+	costInferenceSLAGoodQueries = &querys{
+		query{
+			Name:        "inference-sla-good",
+			QueryString: QueryMap["cost:inference_sla_good"],
+			MetricKey: staticFields{
+				"pod":        "exported_pod",
+				"namespace":  "exported_namespace",
+				"node":       "Hostname",
+				"model_name": "model_name",
+			},
+			QueryValue: &saveQueryValue{Method: "avg", ValName: "inference-sla-good"},
+			RowKey:     []model.LabelName{"exported_pod", "exported_namespace", "Hostname", "model_name"},
+		},
+	}
+	costInferenceSLADegradedQueries = &querys{
+		query{
+			Name:        "inference-sla-degraded",
+			QueryString: QueryMap["cost:inference_sla_degraded"],
+			MetricKey: staticFields{
+				"pod":        "exported_pod",
+				"namespace":  "exported_namespace",
+				"node":       "Hostname",
+				"model_name": "model_name",
+			},
+			QueryValue: &saveQueryValue{Method: "avg", ValName: "inference-sla-degraded"},
+			RowKey:     []model.LabelName{"exported_pod", "exported_namespace", "Hostname", "model_name"},
+		},
+	}
+	costInferenceSLABreachedQueries = &querys{
+		query{
+			Name:        "inference-sla-breached",
+			QueryString: QueryMap["cost:inference_sla_breached"],
+			MetricKey: staticFields{
+				"pod":        "exported_pod",
+				"namespace":  "exported_namespace",
+				"node":       "Hostname",
+				"model_name": "model_name",
+			},
+			QueryValue: &saveQueryValue{Method: "avg", ValName: "inference-sla-breached"},
+			RowKey:     []model.LabelName{"exported_pod", "exported_namespace", "Hostname", "model_name"},
 		},
 	}
 	costOtelGenaiInputTokenQueries = &querys{
