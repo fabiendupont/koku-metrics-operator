@@ -597,6 +597,17 @@ func generateInferenceTokenMetricsReport(log gologr.Logger, c *PrometheusCollect
 		return err
 	}
 
+	// Query SLA compliance metrics (vLLM TTFT histogram-based).
+	// This is independent of the token source — it only applies when vLLM
+	// histograms are available. The result is merged into the token rows
+	// later so cost models can apply SLA-based discounts.
+	slaResults := mappedResults{}
+	log.Info("querying for vLLM SLA compliance metrics")
+	if err := c.getQueryRangeResults(costInferenceSLAComplianceQueries, &slaResults, MaxRetries); err != nil {
+		// SLA metrics are optional — log and continue if unavailable
+		log.Info("SLA compliance metrics not available, skipping")
+	}
+
 	// If vLLM metrics returned no results, try OTel GenAI standard metrics.
 	// These follow the OpenTelemetry gen_ai.client.token.usage convention and
 	// are emitted by MLflow, Envoy AI Gateway, and other OTel-instrumented stacks.
@@ -634,6 +645,12 @@ func generateInferenceTokenMetricsReport(log gologr.Logger, c *PrometheusCollect
 	for key, val := range inputTokenResults {
 		if outputVal, ok := outputTokenResults[key]; ok {
 			for dataKey, dataVal := range outputVal {
+				val[dataKey] = dataVal
+			}
+		}
+		// Merge SLA compliance data if available for this key
+		if slaVal, ok := slaResults[key]; ok {
+			for dataKey, dataVal := range slaVal {
 				val[dataKey] = dataVal
 			}
 		}

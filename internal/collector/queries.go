@@ -66,6 +66,13 @@ var (
 		"cost:otel_genai_input_tokens":  "sum by (namespace, pod, gen_ai_request_model) (gen_ai_client_token_usage_sum{gen_ai_token_type='input'})",
 		"cost:otel_genai_output_tokens": "sum by (namespace, pod, gen_ai_request_model) (gen_ai_client_token_usage_sum{gen_ai_token_type='output'})",
 
+		// SLA compliance metrics for inference billing.
+		// Calculates the fraction of requests that met the TTFT SLA threshold
+		// using Prometheus histogram_fraction(). The threshold is hardcoded to
+		// 0.5s (500ms) — a common TTFT SLA for interactive inference.
+		// Returns a value between 0.0 (all breached) and 1.0 (all compliant).
+		"cost:inference_sla_compliance": "histogram_fraction(0, 0.5, sum by (exported_pod, exported_namespace, Hostname, model_name) (rate(vllm:time_to_first_token_seconds_bucket[1h])))",
+
 		// Identity-based token metrics from Kuadrant Limitador.
 		// authorized_hits tracks token consumption per user/organization via TelemetryPolicy.
 		// Labels come from auth.identity selectors (Keycloak JWT claims).
@@ -595,6 +602,23 @@ var (
 				ValName: "inference-output-tokens",
 			},
 			RowKey: []model.LabelName{"exported_pod", "exported_namespace", "Hostname", "model_name", "label_serving_kserve_io_inferenceservice"},
+		},
+	}
+	costInferenceSLAComplianceQueries = &querys{
+		query{
+			Name:        "inference-sla-compliance",
+			QueryString: QueryMap["cost:inference_sla_compliance"],
+			MetricKey: staticFields{
+				"pod":        "exported_pod",
+				"namespace":  "exported_namespace",
+				"node":       "Hostname",
+				"model_name": "model_name",
+			},
+			QueryValue: &saveQueryValue{
+				Method:  "avg",
+				ValName: "inference-sla-compliance",
+			},
+			RowKey: []model.LabelName{"exported_pod", "exported_namespace", "Hostname", "model_name"},
 		},
 	}
 	costOtelGenaiInputTokenQueries = &querys{

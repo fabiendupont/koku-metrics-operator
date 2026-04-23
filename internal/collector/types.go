@@ -449,6 +449,7 @@ type inferenceTokenRow struct {
 	Organization     string `mapstructure:"organization"`
 	InputTokens      string `mapstructure:"inference-input-tokens"`
 	OutputTokens     string `mapstructure:"inference-output-tokens"`
+	SLACompliance    string `mapstructure:"inference-sla-compliance"`
 }
 
 func (inferenceTokenRow) csvHeader() []string {
@@ -465,6 +466,7 @@ func (inferenceTokenRow) csvHeader() []string {
 		"organization",
 		"inference_input_tokens",
 		"inference_output_tokens",
+		"sla_compliance",
 	}
 }
 
@@ -482,6 +484,7 @@ func (row inferenceTokenRow) csvRow() []string {
 		row.Organization,
 		row.InputTokens,
 		row.OutputTokens,
+		row.SLACompliance,
 	}
 }
 
