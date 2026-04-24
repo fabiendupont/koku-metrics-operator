@@ -447,6 +447,8 @@ type inferenceTokenRow struct {
 	ModelName        string `mapstructure:"model_name"`
 	InferenceService string `mapstructure:"inference_service"`
 	Organization     string `mapstructure:"organization"`
+	OperationName    string `mapstructure:"operation_name"`
+	ProviderName     string `mapstructure:"provider_name"`
 	InputTokens      string `mapstructure:"inference-input-tokens"`
 	OutputTokens     string `mapstructure:"inference-output-tokens"`
 }
@@ -463,6 +465,8 @@ func (inferenceTokenRow) csvHeader() []string {
 		"model_name",
 		"inference_service",
 		"organization",
+		"operation_name",
+		"provider_name",
 		"inference_input_tokens",
 		"inference_output_tokens",
 	}
@@ -480,6 +484,8 @@ func (row inferenceTokenRow) csvRow() []string {
 		row.ModelName,
 		row.InferenceService,
 		row.Organization,
+		row.OperationName,
+		row.ProviderName,
 		row.InputTokens,
 		row.OutputTokens,
 	}

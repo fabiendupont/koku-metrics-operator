@@ -63,8 +63,8 @@ var (
 		// Prometheus converts OTel histogram gen_ai.client.token.usage to
 		// gen_ai_client_token_usage (dots→underscores). The _sum suffix gives
 		// cumulative token counts.
-		"cost:otel_genai_input_tokens":  "sum by (namespace, pod, gen_ai_request_model) (gen_ai_client_token_usage_sum{gen_ai_token_type='input'})",
-		"cost:otel_genai_output_tokens": "sum by (namespace, pod, gen_ai_request_model) (gen_ai_client_token_usage_sum{gen_ai_token_type='output'})",
+		"cost:otel_genai_input_tokens":  "sum by (namespace, pod, gen_ai_request_model, gen_ai_operation_name, gen_ai_provider_name) (gen_ai_client_token_usage_sum{gen_ai_token_type='input'})",
+		"cost:otel_genai_output_tokens": "sum by (namespace, pod, gen_ai_request_model, gen_ai_operation_name, gen_ai_provider_name) (gen_ai_client_token_usage_sum{gen_ai_token_type='output'})",
 
 		// Identity-based token metrics from Kuadrant Limitador.
 		// authorized_hits tracks token consumption per user/organization via TelemetryPolicy.
@@ -602,15 +602,17 @@ var (
 			Name:        "inference-input-tokens",
 			QueryString: QueryMap["cost:otel_genai_input_tokens"],
 			MetricKey: staticFields{
-				"pod":        "pod",
-				"namespace":  "namespace",
-				"model_name": "gen_ai_request_model",
+				"pod":            "pod",
+				"namespace":      "namespace",
+				"model_name":     "gen_ai_request_model",
+				"operation_name": "gen_ai_operation_name",
+				"provider_name":  "gen_ai_provider_name",
 			},
 			QueryValue: &saveQueryValue{
 				Method:  "sum",
 				ValName: "inference-input-tokens",
 			},
-			RowKey: []model.LabelName{"pod", "namespace", "gen_ai_request_model"},
+			RowKey: []model.LabelName{"pod", "namespace", "gen_ai_request_model", "gen_ai_operation_name", "gen_ai_provider_name"},
 		},
 	}
 	costOtelGenaiOutputTokenQueries = &querys{
@@ -618,15 +620,17 @@ var (
 			Name:        "inference-output-tokens",
 			QueryString: QueryMap["cost:otel_genai_output_tokens"],
 			MetricKey: staticFields{
-				"pod":        "pod",
-				"namespace":  "namespace",
-				"model_name": "gen_ai_request_model",
+				"pod":            "pod",
+				"namespace":      "namespace",
+				"model_name":     "gen_ai_request_model",
+				"operation_name": "gen_ai_operation_name",
+				"provider_name":  "gen_ai_provider_name",
 			},
 			QueryValue: &saveQueryValue{
 				Method:  "sum",
 				ValName: "inference-output-tokens",
 			},
-			RowKey: []model.LabelName{"pod", "namespace", "gen_ai_request_model"},
+			RowKey: []model.LabelName{"pod", "namespace", "gen_ai_request_model", "gen_ai_operation_name", "gen_ai_provider_name"},
 		},
 	}
 	costIdentityTokenHitsQueries = &querys{
