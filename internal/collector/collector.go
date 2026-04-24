@@ -299,6 +299,11 @@ func generateCostManagementReports(log gologr.Logger, c *PrometheusCollector, di
 		return err
 	}
 
+	// cost agent billing (from Tempo traces)
+	if err := generateAgentBillingReport(log, c.TimeSeries, dirCfg, yearMonth); err != nil {
+		return err
+	}
+
 	return nil
 }
 
